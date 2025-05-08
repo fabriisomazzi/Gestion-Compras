@@ -25,9 +25,8 @@ createApp({
         const newItem = ref({
             name: '',
             category: 'supermercado',
-            quantity: 1,
             unit: 'unidades',
-            price: 0
+
         });
 
         const items = ref([]);
