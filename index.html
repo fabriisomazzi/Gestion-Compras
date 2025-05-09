@@ -38,17 +38,6 @@
         </header>
 
         <div class="container">
-            <!-- Sección de búsqueda y filtros -->
-            <div class="search-filter">
-                <input type="text" v-model="searchQuery" placeholder="Buscar productos..." class="search-input">
-                <select v-model="filterCategory" class="filter-select">
-                    <option value="">Todas las categorías</option>
-                    <option v-for="(cat, key) in categories" :value="key">{{ cat.name }}</option>
-                </select>
-                <button @click="clearFilters" class="clear-btn" v-if="hasFilters">
-                    <i class="fas fa-times"></i> Limpiar
-                </button>
-            </div>
 
             <!-- Sección de entrada de datos -->
             <div class="input-section">
@@ -77,6 +66,18 @@
                 <div class="error-message" v-if="errorMessage">
                     <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
                 </div>
+            </div>
+
+            <!-- Sección de búsqueda y filtros -->
+            <div class="search-filter">
+                <input type="text" v-model="searchQuery" placeholder="Buscar productos..." class="search-input">
+                <select v-model="filterCategory" class="filter-select">
+                    <option value="">Todas las categorías</option>
+                    <option v-for="(cat, key) in categories" :value="key">{{ cat.name }}</option>
+                </select>
+                <button @click="clearFilters" class="clear-btn" v-if="hasFilters">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
             </div>
 
             <!-- Resumen y estadísticas -->
