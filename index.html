@@ -37,10 +37,19 @@
             <p class="subtitle">Organiza tus compras en Italia</p>
         </header>
 
+        <div class="tabs">
+            <button @click="activeTab = 'planned'" :class="{active: activeTab === 'planned'}">
+                <i class="fas fa-list"></i> Lista Planeada
+            </button>
+            <button @click="activeTab = 'purchased'" :class="{active: activeTab === 'purchased'}">
+                <i class="fas fa-cash-register"></i> Compra Realizada
+            </button>
+        </div>
+
         <div class="container">
 
             <!-- Sección de entrada de datos -->
-            <div class="input-section">
+            <div class="input-section" v-if="activeTab === 'planned'">
                 <div class="input-group">
                     <input type="text" v-model="newItem.name" placeholder="Ej: Pan, Pasta, Queso..." 
                            class="item-input" @keyup.enter="addItem" ref="nameInput">
@@ -55,12 +64,12 @@
                     <select v-model="newItem.unit" class="unit-select">
                         <option v-for="unit in units" :value="unit.value">{{ unit.label }}</option>
                     </select>
-                    <input type="number" step="0.01" v-model="newItem.price" 
-                           placeholder="Precio unitario (€)" class="price-input">
+                    <input type="number" step="0.01" v-model="newItem.estimatedPrice" 
+                           placeholder="Precio estimado (€)" class="price-input">
                 </div>
 
-                <button @click="addItem" class="add-button" :disabled="!isValidItem">
-                    <i class="fas fa-plus"></i> Añadir
+                <button @click="addItem" class="add-button" :disabled="!isValidPlannedItem">
+                    <i class="fas fa-plus"></i> Añadir a lista planeada
                 </button>
                 
                 <div class="error-message" v-if="errorMessage">
@@ -83,12 +92,12 @@
             <!-- Resumen y estadísticas -->
             <div class="summary">
                 <div class="total-box">
-                    <h3>Total Compra</h3>
-                    <p class="total-amount">{{ total.toFixed(2) }} €</p>
-                    <div class="items-count">{{ filteredItems.length }} {{ filteredItems.length === 1 ? 'producto' : 'productos' }}</div>
+                    <h3>{{ activeTab === 'planned' ? 'Total Estimado' : 'Total Real' }}</h3>
+                    <p class="total-amount">{{ currentTotal.toFixed(2) }} €</p>
+                    <div class="items-count">{{ currentItems.length }} {{ currentItems.length === 1 ? 'producto' : 'productos' }}</div>
                 </div>
                 <div class="category-totals">
-                    <div v-for="(total, category) in categoryTotals" :key="category" 
+                    <div v-for="(total, category) in currentCategoryTotals" :key="category" 
                          class="category-total" :class="category">
                         <span>{{ categories[category].name }}:</span>
                         <span>{{ total.toFixed(2) }} €</span>
@@ -96,39 +105,107 @@
                 </div>
             </div>
 
-            <!-- Lista de productos -->
-            <div class="items-list">
-                <div v-if="filteredItems.length === 0" class="empty-state">
+            <!-- Lista de productos PLANEADOS -->
+            <div class="items-list" v-if="activeTab === 'planned'">
+                <div v-if="filteredPlannedItems.length === 0" class="empty-state">
                     <i class="fas fa-shopping-basket"></i>
-                    <p>No hay productos en tu lista</p>
+                    <p>No hay productos en tu lista planeada</p>
                     <button @click="addSampleData" class="sample-btn">Añadir datos de ejemplo</button>
                 </div>
                 
                 <transition-group name="list" tag="div">
-                    <div v-for="(item, index) in filteredItems" :key="item.id" 
+                    <div v-for="(item, index) in filteredPlannedItems" :key="item.id" 
                          class="item-card" :class="item.category">
                         <div class="item-info">
                             <h3>{{ item.name }}</h3>
-                            <p>{{ formatQuantity(item.quantity) }} {{ getUnitLabel(item.unit) }} × {{ item.price.toFixed(2) }} €</p>
-                            <p class="item-total">{{ (item.quantity * item.price).toFixed(2) }} €</p>
+                            <p>{{ formatQuantity(item.quantity) }} {{ getUnitLabel(item.unit) }} × {{ item.estimatedPrice.toFixed(2) }} €</p>
+                            <p class="item-total">{{ (item.quantity * item.estimatedPrice).toFixed(2) }} €</p>
                             <div class="item-date" v-if="item.dateAdded">
                                 <i class="far fa-calendar-alt"></i> {{ formatDate(item.dateAdded) }}
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button @click="editItem(index)" class="edit-btn" title="Editar">
+                            <button @click="editPlannedItem(index)" class="edit-btn" title="Editar">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button @click="confirmDelete(index)" class="delete-btn" title="Eliminar">
+                            <button @click="confirmDelete(index, 'planned')" class="delete-btn" title="Eliminar">
                                 <i class="fas fa-trash"></i>
                             </button>
-                            <button @click="togglePurchased(index)" class="purchased-btn" 
-                                    :class="{purchased: item.purchased}" :title="item.purchased ? 'Marcar como no comprado' : 'Marcar como comprado'">
-                                <i class="fas" :class="item.purchased ? 'fa-check-circle' : 'fa-circle'"></i>
+                            <button @click="moveToPurchased(index)" class="purchased-btn" title="Marcar como comprado">
+                                <i class="fas fa-cart-arrow-down"></i>
                             </button>
                         </div>
                     </div>
                 </transition-group>
+            </div>
+
+            <!-- Lista de productos COMPRADOS -->
+            <div class="items-list" v-if="activeTab === 'purchased'">
+                <div v-if="filteredPurchasedItems.length === 0" class="empty-state">
+                    <i class="fas fa-cash-register"></i>
+                    <p>No hay productos en tu lista de compras realizadas</p>
+                </div>
+                
+                <transition-group name="list" tag="div">
+                    <div v-for="(item, index) in filteredPurchasedItems" :key="item.id" 
+                         class="item-card" :class="item.category">
+                        <div class="item-info">
+                            <h3>{{ item.name }}</h3>
+                            <div class="price-comparison" v-if="item.estimatedPrice">
+                                <p>
+                                    {{ formatQuantity(item.quantity) }} {{ getUnitLabel(item.unit) }} × 
+                                    <span class="actual-price">{{ item.actualPrice.toFixed(2) }} €</span>
+                                    <span class="price-difference" :class="getPriceDifferenceClass(item)">
+                                        ({{ getPriceDifference(item) }})
+                                    </span>
+                                </p>
+                                <p class="original-estimate">
+                                    Estimado: {{ item.estimatedPrice.toFixed(2) }} €
+                                </p>
+                            </div>
+                            <p v-else>
+                                {{ formatQuantity(item.quantity) }} {{ getUnitLabel(item.unit) }} × {{ item.actualPrice.toFixed(2) }} €
+                            </p>
+                            <p class="item-total">{{ (item.quantity * item.actualPrice).toFixed(2) }} €</p>
+                            <div class="item-date" v-if="item.purchaseDate">
+                                <i class="far fa-calendar-alt"></i> {{ formatDate(item.purchaseDate) }}
+                            </div>
+                        </div>
+                        <div class="item-actions">
+                            <button @click="editPurchasedItem(index)" class="edit-btn" title="Editar precio">
+                                <i class="fas fa-euro-sign"></i>
+                            </button>
+                            <button @click="confirmDelete(index, 'purchased')" class="delete-btn" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button @click="moveToPlanned(index)" class="return-btn" title="Devolver a lista planeada">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        </div>
+                    </div>
+                </transition-group>
+
+                <!-- Formulario para agregar compra no planeada -->
+                <div class="unplanned-purchase" v-if="activeTab === 'purchased'">
+                    <h3><i class="fas fa-plus-circle"></i> Añadir compra no planeada</h3>
+                    <div class="input-group">
+                        <input type="text" v-model="unplannedItem.name" placeholder="Producto comprado" 
+                               @keyup.enter="addUnplannedItem">
+                        <select v-model="unplannedItem.category">
+                            <option v-for="(cat, key) in categories" :value="key">{{ cat.name }}</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" v-model="unplannedItem.quantity" placeholder="Cantidad" min="0.1" step="0.1">
+                        <select v-model="unplannedItem.unit">
+                            <option v-for="unit in units" :value="unit.value">{{ unit.label }}</option>
+                        </select>
+                        <input type="number" step="0.01" v-model="unplannedItem.actualPrice" placeholder="Precio real (€)">
+                    </div>
+                    <button @click="addUnplannedItem" :disabled="!isValidUnplannedItem">
+                        <i class="fas fa-plus"></i> Añadir a compras
+                    </button>
+                </div>
             </div>
 
             <!-- Acciones adicionales -->
@@ -142,8 +219,8 @@
                 <button @click="printList" class="action-btn">
                     <i class="fas fa-print"></i> Imprimir
                 </button>
-                <button @click="clearList" class="action-btn danger">
-                    <i class="fas fa-trash-alt"></i> Limpiar
+                <button @click="clearCurrentList" class="action-btn danger">
+                    <i class="fas fa-trash-alt"></i> Limpiar {{ activeTab === 'planned' ? 'lista' : 'compras' }}
                 </button>
             </div>
         </div>
@@ -156,6 +233,37 @@
                 <div class="modal-actions">
                     <button @click="confirmAction" class="modal-btn confirm">{{ modalConfirmText }}</button>
                     <button @click="cancelAction" class="modal-btn cancel">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para editar precio -->
+        <div class="modal-overlay" v-if="showPriceModal">
+            <div class="modal">
+                <h3>Editar Precio</h3>
+                <div class="price-modal-content">
+                    <div class="item-info">
+                        <h4>{{ priceModalItem.name }}</h4>
+                        <p>{{ formatQuantity(priceModalItem.quantity) }} {{ getUnitLabel(priceModalItem.unit) }}</p>
+                    </div>
+                    <div class="price-inputs">
+                        <div class="input-group" v-if="priceModalItem.estimatedPrice">
+                            <label>Precio estimado:</label>
+                            <input type="number" step="0.01" v-model="priceModalItem.estimatedPrice" disabled>
+                        </div>
+                        <div class="input-group">
+                            <label>Precio real:</label>
+                            <input type="number" step="0.01" v-model="priceModalItem.actualPrice">
+                        </div>
+                        <div class="price-difference" v-if="priceModalItem.estimatedPrice">
+                            Diferencia: {{ calculatePriceDifference(priceModalItem) }} €
+                            ({{ calculatePercentageDifference(priceModalItem) }}%)
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button @click="savePriceEdit" class="modal-btn confirm">Guardar</button>
+                    <button @click="cancelPriceEdit" class="modal-btn cancel">Cancelar</button>
                 </div>
             </div>
         </div>
