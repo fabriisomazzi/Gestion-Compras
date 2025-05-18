@@ -73,7 +73,7 @@ Diseño responsive (funciona en móviles)
 Clona el repositorio:
 
 bash
-git clone https://github.com/tu-usuario/gestor-compras-italia.git
+git clone https://github.com/fabrii_somazzi/gestor-compras-italia.git
 Abre el archivo index.html en tu navegador.
 
 
